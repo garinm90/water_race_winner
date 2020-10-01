@@ -1,102 +1,61 @@
-#! /home/fpp/.local/share/virtualenvs/serial-OoMteMnA/bin/python
-from threading import Timer
-import requests
-from game import Game, GameOver, GameStart, Attract
+#!/home/fpp/.local/share/virtualenvs/serial-OoMteMnA/bin/python
 from serial import Serial
 from serial.tools import list_ports
+import requests
+from functools import partial
+from time import sleep
+from threading import Timer
 
 BAUDRATE = 19200
 SOH = b'\x01'
 ETX = b'\x03'
-WINNER_COMMAND = b':Winner'
-SYNC_COMMAND = b'Sync'
-GAME_START = b'Game Start'
-ALT_START = b'400Null'
+PLAY_SOUND = b'p+'
+STOP_SOUND = b'p-'
+ATTRACT = b'z00Sy'
 COMMAND_LINK = 'http://localhost/api/command/'
-PLAYER_ENABLE = b':Enabled'
-PLAYER_DISABLE = b':Disabled'
-# Iterate through serial ports and return USB serial device.
-PLAYER_NUMBER = {
-    b"1": "1",
-    b"2": "2",
-    b"3": "3",
-    b"4": "4",
-    b"5": "5",
-    b"6": "6",
-    b"7": "7",
-    b"8": "8",
-    b"9": "9",
-    b":": "10",
-    b";": "11",
-    b"<": "12",
-    b"=": "13",
-    b">": "14",
-    b"?": "15",
-    b"@": "16"
+MATCHES = [PLAY_SOUND, ATTRACT]
+
+def play_winner(player_number):
+    json_payload = [f"Player_{player_number}W", "", "true", "false"]
+    r = requests.post(COMMAND_LINK + 'Effect Start', json=json_payload)
+    print('wemadeit')
+    winner_timer.start()
+
+def race_start():
+    r = requests.get('http://localhost/api/playlists/pause')
+
+
+
+sound_files = {
+    b'1C' : partial(play_winner, '1'),
+    b'1D' : partial(play_winner, '2'),
+    b'1E' : partial(play_winner, '3'),
+    b'1F' : partial(play_winner, '4'),
+    b'20' : partial(play_winner, '5'),
+    b'21' : partial(play_winner, '6'), 
+    b'22' : partial(play_winner, '7'), 
+    b'23' : partial(play_winner, '8'), 
+    b'24' : partial(play_winner, '9'), 
+    b'25' : partial(play_winner, '10'), 
+    b'26' : partial(play_winner, '11'), 
+    b'27' : partial(play_winner, '12'), 
+    b'28' : partial(play_winner, '13'), 
+    b'29' : partial(play_winner, '14'), 
+    b'2A' : partial(play_winner, '15'), 
+    b'2B' : partial(play_winner, '16'), 
+    b'3C' : race_start,
+    b'3D' : race_start,
+    b'3E' : race_start,
+    b'3F' : race_start,
+    b'40' : race_start,
+    b'41' : race_start,
+    b'09' : 'Start_Sound',
+    b'0A' : 'Demo/Stop_Sound',
 }
 
-game_state = Game()
+    
 
-
-def setup_overlay_models():
-    payload = {
-        "RGB": [
-            255,
-            255,
-            255
-        ]
-    }
-    for i in range(1, 17):
-        r = requests.put(
-                f'http://localhost/api/overlays/model/Player_{str(i)}/fill', json=payload)
-
-
-def stop_winner_effect():
-    for i in range(1, 17):
-        r = requests.get(COMMAND_LINK + f'Effect Stop/Player_{str(i)}W/')
-        print(r.status_code)
-        print(f'Player Number {str(i)} stopped')
-
-
-def sync_game():
-    r = requests.get('http://localhost/api/playlists/resume')
-    if r.status_code == 200:
-        print('Starting Attract')
-
-
-
-
-def pause_attract():
-    if (isinstance(game_state.state, Attract)):
-        for i in range(1, 17):
-            payload = {'State': 0}
-            r = requests.put(
-                f'http://localhost/api/overlays/model/Player_{str(i)}/state', json=payload)
-            print(r.status_code)
-            print(r.url)
-        r = requests.get('http://localhost/api/playlists/pause')
-        game_state.change(GameStart)
-        if r.status_code == 200:
-            print('Paused Playlist')
-
-
-def play_winner(winner_number):
-    if isinstance(game_state.state, GameStart):
-        json_payload = [f"Player_{winner_number}W", "", "true", "false"]
-        r = requests.post(COMMAND_LINK + 'Effect Start', json=json_payload)
-        game_state.change(GameOver)
-        winner_timer.start()
-        return
-
-
-def reset_attract():
-    if (isinstance(game_state.state, GameOver)):
-        game_state.change(Attract)
-        winner_timer.cancel()
-        sync_game()
-        stop_winner_effect()
-
-def get_usb_serial():
+def get_usb_serial(ports):
     for port in ports:
         if port.product:
             print('\n========================')
@@ -104,75 +63,74 @@ def get_usb_serial():
             print('========================\n')
             return port.device
 
-
-def disable_player(player_number):
-    payload = {'State': 0}
-    r = requests.put(f'http://localhost/api/overlays/model/Player_{player_number}/state', json=payload)
-
-
-def enable_player(player_number):
-    payload = {'State': 1}
-    r = requests.put(f'http://localhost/api/overlays/model/Player_{player_number}/state', json=payload)
-
-
 def seek_soh():
     byte_list = []
-    ser.in_waiting
     if (ser.in_waiting):
         byte_char = ser.read(ser.in_waiting)
+        print(byte_char)
         if (byte_char == b'\x01'):
             byte_list.append(byte_char)
             while 1:
                 if (ser.in_waiting):
-                    byte_char = ser.read(1)
+                    byte_char = ser.read(ser.in_waiting)
                     byte_list.append(byte_char)
                     if byte_char == b'\x03':
                         break
         if byte_list:
             return bytes(b''.join(byte_list))
 
+def get_buffer():
+    if(ser.in_waiting):
+        data = ser.read_until(b'\x03')
+        return data
 
-def get_command(byte_list):
-    if byte_list:
-        print(byte_list)
-        i = byte_list.find(WINNER_COMMAND)
-        if(i > 0):
-            winner_number = byte_list[i-2:i]
-            winner_number = winner_number.decode('ascii').lstrip('0')
-            play_winner(winner_number)
-        i = byte_list.find(GAME_START)
-        k = byte_list.find(ALT_START)
-        if(i > 0 or k > 0):
-            pause_attract()
-        i = byte_list.find(SYNC_COMMAND)
-        if(i > 0 and isinstance(game_state.state, GameOver)):
-            game_state.change(Attract)
-            winner_timer.cancel()
-            sync_game()
-            stop_winner_effect()
-        i = byte_list.find(PLAYER_ENABLE)
-        if(i > 0 and isinstance(game_state.state, Attract)):
-            player_number = byte_list[i-2:i]
-            player_number = player_number.decode('ascii').lstrip('0')
-            enable_player(player_number)
-        i = byte_list.find(PLAYER_DISABLE)
-        if(i > 0 and isinstance(game_state.state, Attract)):
-            player_number = byte_list[i-2:i]
-            player_number = player_number.decode('ascii').lstrip('0')
-            disable_player(player_number)
+def sync():
+    print('Sync')
+    winner_timer.cancel()
+    for i in range(1, 17):
+        r = requests.get('http://localhost/api/playlists/resume')
+        r = requests.get(COMMAND_LINK + f'Effect Stop/Player_{str(i)}W/')
+        # print(f'Disabled Winner Effects')
+        # print('Restarted Attract Mode')
+    
+    
+def play_effect(player_number):
+    if player_number in sound_files:
+        print(player_number)
+        sound_files[player_number]()
 
+def reset_game(stop_number):
+    if stop_number in sound_files:
+        print('Reset')
+    
+def get_command(command):
+    print(command)
+    if any(x in command for x in MATCHES):
+        index = 0
+        commands = []
+        play_requests = command.find(PLAY_SOUND)
+        sync_requests = command.find(ATTRACT)
+        if(play_requests >= 0):
+            while index >= 0:
+                index = command.find(PLAY_SOUND, index+1)
+                if index < 0:
+                    break
+                player_number = command[index+2:index+4]
+                play_effect_partial = partial(play_effect, player_number)
+                commands.append(play_effect_partial)
+        elif(sync_requests >= 0):
+            print(command)
+            commands.append(sync)
+        print(commands)
+        return commands
+    else:
+        return None
 
-
-# Setup Game State
-
-
-
+ser = Serial(port=get_usb_serial(list_ports.comports()), baudrate=BAUDRATE, timeout=1)
 
 if __name__ == '__main__':
     try:
         # Find and initialize serial ports.
-        ports = list_ports.comports()
-        ser = Serial(port=get_usb_serial(), baudrate=BAUDRATE, timeout=0)
         ser.flushInput()
         ser.flushOutput()
         print('========================')
@@ -180,22 +138,18 @@ if __name__ == '__main__':
         print(f'Baudrate @{ser.baudrate}')
         print('========================\n')
 
-
-        # Resume lights if they are left paused
-        sync_game()
-        # Disable all the winner flashes if one has been left on
-        stop_winner_effect()
-        # Make sure all players are disabled.
-        for i in range(1, 17):
-            disable_player(str(i))
-
-        # Set lights to white but hidden for enabling and disabling players
-        setup_overlay_models()
-        # Setup a timer incase we don't recieve the sync command we timeout the winner and go back into the attract mode
-        winner_timer = Timer(15, reset_attract)
-
+        winner_timer = Timer(10, sync)
+        sync()
+        # Main Loop
         while True:
-            get_command(seek_soh())
+            a = get_buffer()
+            if (a):
+                commands = get_command(a)
+                if commands:
+                    [c() for c in commands]
+                    pass
+
+
     except KeyboardInterrupt as e:
         print(e)
         ser.close()

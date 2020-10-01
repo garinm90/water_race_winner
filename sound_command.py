@@ -1,5 +1,5 @@
+#!/home/fpp/.local/share/virtualenvs/serial-OoMteMnA/bin/python
 from serial import Serial
-from serial.serialutil import LF
 from serial.tools import list_ports
 import requests
 from functools import partial
@@ -138,7 +138,7 @@ if __name__ == '__main__':
         print(f'Baudrate @{ser.baudrate}')
         print('========================\n')
 
-        winner_timer = Timer(15, sync)
+        winner_timer = Timer(10, sync)
         # Main Loop
         while True:
             a = get_buffer()
