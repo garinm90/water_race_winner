@@ -1,0 +1,14 @@
+[Unit]
+Description=Serial Winner Target
+After=network.target
+
+[Service]
+ExecStart=/home/fpp/serial/main.py
+WorkingDirectory=/home/fpp/serial
+StandardOutput=inherit
+StandardError=inherit
+Restart=always
+User=fpp
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,14 @@
+[Unit]
+Description=Reset Service Target
+After=network.target
+
+[Service]
+ExecStart=/home/fpp/serial/reset.py
+WorkingDirectory=/home/fpp/serial
+StandardOutput=inherit
+StandardError=inherit
+Restart=always
+User=fpp
+
+[Install]
+WantedBy=multi-user.target
