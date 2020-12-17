@@ -1,4 +1,4 @@
 {
-    "python.pythonPath": "/home/fpp/.local/share/virtualenvs/serial-OoMteMnA/bin/python",
+    "python.pythonPath": "/home/fpp/.virtualenvs/serial-OoMteMnA/bin/python",
     "python.linting.enabled": true
 }
